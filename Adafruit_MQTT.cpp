@@ -117,6 +117,8 @@ Adafruit_MQTT::Adafruit_MQTT(const char *server, uint16_t port, const char *cid,
   will_retain = 0;
 
   packet_id_counter = 0;
+
+  setKeepAlive(MQTT_CONN_KEEPALIVE);
 }
 
 Adafruit_MQTT::Adafruit_MQTT(const char *server, uint16_t port,
@@ -138,6 +140,23 @@ Adafruit_MQTT::Adafruit_MQTT(const char *server, uint16_t port,
   will_retain = 0;
 
   packet_id_counter = 0;
+
+  setKeepAlive(MQTT_CONN_KEEPALIVE);
+}
+
+/**************************************************************************/
+/*!
+    @brief  Sets the MQTT KeepAlive interval. MUST be set prior to
+            calling connect().
+    @param    keepAliveInterval
+              The maximum time interval that is permitted to elapse between
+              the point at which the Client finishes transmitting
+              one Control Packet and the point it starts sending the next,
+              in seconds.
+*/
+/**************************************************************************/
+void Adafruit_MQTT::setKeepAlive(uint16_t keepAliveInterval) {
+    keepAlive = keepAliveInterval;
 }
 
 int8_t Adafruit_MQTT::connect() {
@@ -629,9 +648,9 @@ uint8_t Adafruit_MQTT::connectPacket(uint8_t *packet) {
     p[0] |= MQTT_CONN_PASSWORDFLAG;
   p++;
 
-  p[0] = MQTT_CONN_KEEPALIVE >> 8;
+  p[0] = keepAlive >> 8;
   p++;
-  p[0] = MQTT_CONN_KEEPALIVE & 0xFF;
+  p[0] = keepAlive & 0xFF;
   p++;
 
   if (MQTT_PROTOCOL_LEVEL == 3) {

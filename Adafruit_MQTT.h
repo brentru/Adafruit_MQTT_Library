@@ -172,6 +172,9 @@ public:
   // Serial.println without any further processing.
   const __FlashStringHelper *connectErrorString(int8_t code);
 
+  // Sets MQTT keepalive timeout, in seconds
+  void setKeepAlive(uint16_t keepAliveInterval);
+
   // Sends MQTT disconnect packet and calls disconnectServer()
   bool disconnect();
 
@@ -267,6 +270,8 @@ private:
   uint8_t unsubscribePacket(uint8_t *packet, const char *topic);
   uint8_t pingPacket(uint8_t *packet);
   uint8_t pubackPacket(uint8_t *packet, uint16_t packetid);
+
+  uint16_t keepAlive; // MQTT KeepAlive interval
 };
 
 class Adafruit_MQTT_Publish {
