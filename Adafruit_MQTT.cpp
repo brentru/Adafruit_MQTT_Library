@@ -156,7 +156,7 @@ Adafruit_MQTT::Adafruit_MQTT(const char *server, uint16_t port,
 */
 /**************************************************************************/
 void Adafruit_MQTT::setKeepAlive(uint16_t keepAliveInterval) {
-    keepAlive = keepAliveInterval;
+  keepAlive = keepAliveInterval;
 }
 
 int8_t Adafruit_MQTT::connect() {
