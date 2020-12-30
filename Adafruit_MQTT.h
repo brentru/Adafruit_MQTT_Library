@@ -173,7 +173,7 @@ public:
   const __FlashStringHelper *connectErrorString(int8_t code);
 
   // Sets MQTT keepalive timeout, in seconds
-  void setKeepAlive(uint16_t keepAliveInterval);
+  bool setKeepAlive(uint16_t keepAliveInterval);
 
   // Sends MQTT disconnect packet and calls disconnectServer()
   bool disconnect();

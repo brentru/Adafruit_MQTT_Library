@@ -153,10 +153,16 @@ Adafruit_MQTT::Adafruit_MQTT(const char *server, uint16_t port,
               the point at which the Client finishes transmitting
               one Control Packet and the point it starts sending the next,
               in seconds.
+    @return   True, otherwise False if improperly called after connect().
 */
 /**************************************************************************/
-void Adafruit_MQTT::setKeepAlive(uint16_t keepAliveInterval) {
+bool Adafruit_MQTT::setKeepAlive(uint16_t keepAliveInterval) {
+  if (connected()) {
+    DEBUG_PRINT(F("KeepAlive defined after connect"));
+    return false;
+  }
   keepAlive = keepAliveInterval;
+  return true;
 }
 
 int8_t Adafruit_MQTT::connect() {
