@@ -181,6 +181,15 @@ int8_t Adafruit_MQTT::connect() {
   if (buffer[3] != 0)
     return buffer[3];
 
+    for (i = 0; i < MAXSUBSCRIPTIONS; i++) {
+      if (subscriptions[i] == 0) {
+        DEBUG_PRINT(F("Added sub "));
+        DEBUG_PRINTLN(i);
+        subscriptions[i] = sub;
+        return true;
+      }
+    }
+
   // Setup subscriptions once connected.
   for (uint8_t i = 0; i < MAXSUBSCRIPTIONS; i++) {
     // Ignore subscriptions that aren't defined.
