@@ -53,11 +53,11 @@ void printBuffer(uint8_t *buffer, uint16_t len) {
       DEBUG_PRINTER.write(buffer[i]);
     else
       DEBUG_PRINTER.print(" ");
-/*     DEBUG_PRINTER.print(F(" [0x"));
+    DEBUG_PRINTER.print(F(" [0x"));
     if (buffer[i] < 0x10)
       DEBUG_PRINTER.print("0");
     DEBUG_PRINTER.print(buffer[i], HEX);
-    DEBUG_PRINTER.print("], "); */
+    DEBUG_PRINTER.print("], ");
     if (i % 8 == 7) {
       DEBUG_PRINTER.print("\n\t");
     }
@@ -349,6 +349,9 @@ bool Adafruit_MQTT::publish(const char *topic, uint8_t *data, uint16_t bLen,
       publishPacket(buffer, topic, data, bLen, qos, (uint16_t)sizeof(buffer));
   if (!sendPacket(buffer, len))
     return false;
+
+  DEBUG_PRINT(F("Publishing across:\t"));
+  DEBUG_PRINTLN(topic);
 
   // If QOS level is high enough verify the response packet.
   if (qos > 0) {
