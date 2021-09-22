@@ -53,11 +53,11 @@ void printBuffer(uint8_t *buffer, uint16_t len) {
       DEBUG_PRINTER.write(buffer[i]);
     else
       DEBUG_PRINTER.print(" ");
-    DEBUG_PRINTER.print(F(" [0x"));
+/*     DEBUG_PRINTER.print(F(" [0x"));
     if (buffer[i] < 0x10)
       DEBUG_PRINTER.print("0");
     DEBUG_PRINTER.print(buffer[i], HEX);
-    DEBUG_PRINTER.print("], ");
+    DEBUG_PRINTER.print("], "); */
     if (i % 8 == 7) {
       DEBUG_PRINTER.print("\n\t");
     }
@@ -181,14 +181,6 @@ int8_t Adafruit_MQTT::connect() {
   if (buffer[3] != 0)
     return buffer[3];
 
-    for (i = 0; i < MAXSUBSCRIPTIONS; i++) {
-      if (subscriptions[i] == 0) {
-        DEBUG_PRINT(F("Added sub "));
-        DEBUG_PRINTLN(i);
-        subscriptions[i] = sub;
-        return true;
-      }
-    }
 
   // Setup subscriptions once connected.
   for (uint8_t i = 0; i < MAXSUBSCRIPTIONS; i++) {
