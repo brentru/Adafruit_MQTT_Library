@@ -22,56 +22,69 @@
 
 /************************* WiFi Access Point *********************************/
 
-#define WLAN_SSID       "WLAN_SSID"
-#define WLAN_PASS       "WIFI_PASSWORD"
+#define WLAN_SSID "WLAN_SSID"
+#define WLAN_PASS "WIFI_PASSWORD"
 
 /************************* Adafruit.io Setup *********************************/
 
-#define AIO_SERVER      "io.adafruit.com"
+#define AIO_SERVER "io.adafruit.com"
 // Using port 8883 for MQTTS
-#define AIO_SERVERPORT  8883
+#define AIO_SERVERPORT 8883
 // Adafruit IO Account Configuration
-// (to obtain these values, visit https://io.adafruit.com and click on Active Key)
-#define AIO_USERNAME    "YOUR_ADAFRUIT_IO_USERNAME"
-#define AIO_KEY         "YOUR_ADAFRUIT_IO_KEY"
+// (to obtain these values, visit https://io.adafruit.com and click on Active
+// Key)
+#define AIO_USERNAME "YOUR_ADAFRUIT_IO_USERNAME"
+#define AIO_KEY "YOUR_ADAFRUIT_IO_KEY"
 
 /************ Global State (you don't need to change this!) ******************/
 
 // WiFiFlientSecure for SSL/TLS support
 WiFiClientSecure client;
 
-// Setup the MQTT client class by passing in the WiFi client and MQTT server and login details.
-Adafruit_MQTT_Client mqtt(&client, AIO_SERVER, AIO_SERVERPORT, AIO_USERNAME, AIO_KEY);
+// Setup the MQTT client class by passing in the WiFi client and MQTT server and
+// login details.
+Adafruit_MQTT_Client mqtt(&client, AIO_SERVER, AIO_SERVERPORT, AIO_USERNAME,
+                          AIO_KEY);
 
-// io.adafruit.com SHA1 fingerprint
-/* WARNING - This value was last updated on 07/14/25 and may not be up-to-date!
-*  If security is a concern for your project, we strongly recommend users impacted by this move
-*  to a larger MCU like ESP32 which has certificate verification by storing root certs and having
-*  a chain-of-trust rather than doing individual certificate fingerprints. */
-/*  For Mac, Linux and WSL users: Run the following command to get the latest fingerprint (with OpenSSL):
+/* Warning - SSL Fingerprinting is no longer supported!
+ *  io.adafruit.com's certificate is now renewed automatically and the
+ * fingerprint changes when the certificate is renewed (every 199 days, or
+ * less). Each time the certificate is renewed, the fingerprint will change,
+ *  your device will disconnect from io.adafruit.com and you will need to update
+ * your sketch with the new fingerprint. If security is a concern for your
+ * project, we strongly recommend users impacted by this move to a larger MCU
+ * like ESP32 which has certificate verification by storing root certs and
+ * having a chain-of-trust rather than doing individual certificate
+ * fingerprints.
+ */
+
+/*  For Mac, Linux and WSL users: Run the following command to get the latest
+fingerprint (with OpenSSL):
 ```
-openssl s_client -connect [io.adafruit.com]:8883 -showcerts </dev/null 2>/dev/null | openssl x509 -fingerprint -noout | sed 's/:/ /g' | sed 's/SHA1 Fingerprint=//'
+openssl s_client -connect [io.adafruit.com]:8883 -showcerts </dev/null
+2>/dev/null | openssl x509 -fingerprint -noout | sed 's/:/ /g' | sed 's/SHA1
+Fingerprint=//'
 ```
 */
 /*  Windows users can use Powershell and not need to install OpenSSL:
 ```
 $tcpClient = New-Object System.Net.Sockets.TcpClient("io.adafruit.com", 8883);
-$sslStream = New-Object System.Net.Security.SslStream($tcpClient.GetStream(), $false, ({$True}));
-$sslStream.AuthenticateAsClient("io.adafruit.com");
-$cert = $sslStream.RemoteCertificate;
-$fingerprint = ($cert.GetCertHashString());
+$sslStream = New-Object System.Net.Security.SslStream($tcpClient.GetStream(),
+$false, ({$True})); $sslStream.AuthenticateAsClient("io.adafruit.com"); $cert =
+$sslStream.RemoteCertificate; $fingerprint = ($cert.GetCertHashString());
 Write-Output ($fingerprint -replace '(.{2})', '$1 ' -replace ' $', '');
 ```
 */
 
-/* Replace the value below with your updated SHA1 fingerprint for io.adafruit.com: */
-static const char *fingerprint PROGMEM = "47 D2 CB 14 DF 38 97 59 C6 65 1A 1F 3E 00 1E 53 CC A5 17 E0";
+/* Replace the empty string below with your updated SHA1 fingerprint (e.g: "47 D2 CB 14..."") */
+static const char *fingerprint PROGMEM = " ";
 
 /****************************** Feeds ***************************************/
 
 // Setup a feed called 'test' for publishing.
 // Notice MQTT paths for AIO follow the form: <username>/feeds/<feedname>
-Adafruit_MQTT_Publish test = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/test");
+Adafruit_MQTT_Publish test =
+    Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/test");
 
 /*************************** Sketch Code ************************************/
 
@@ -82,7 +95,8 @@ void setup() {
   Serial.println(F("Adafruit IO MQTTS (SSL/TLS) Example"));
 
   // Connect to WiFi access point.
-  Serial.println(); Serial.println();
+  Serial.println();
+  Serial.println();
   Serial.print("Connecting to ");
   Serial.println(WLAN_SSID);
 
@@ -98,25 +112,27 @@ void setup() {
   Serial.println();
 
   Serial.println("WiFi connected");
-  Serial.println("IP address: "); Serial.println(WiFi.localIP());
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
 
-  /* Verify SSL fingerprint (see above for instructions to update the SSL fingerprint) */
+  /* Verify SSL fingerprint (see above for instructions to update the SSL
+   * fingerprint) */
   client.setFingerprint(fingerprint);
 }
 
-uint32_t x=0;
+uint32_t x = 0;
 
 void loop() {
   // Ensure the connection to the MQTT server is alive (this will make the first
-  // connection and automatically reconnect when disconnected).  See the MQTT_connect
-  // function definition further below.
+  // connection and automatically reconnect when disconnected).  See the
+  // MQTT_connect function definition further below.
   MQTT_connect();
 
   // Now we can publish stuff!
   Serial.print(F("\nSending val "));
   Serial.print(x);
   Serial.print(F(" to test feed..."));
-  if (! test.publish(x++)) {
+  if (!test.publish(x++)) {
     Serial.println(F("Failed"));
   } else {
     Serial.println(F("OK!"));
@@ -124,7 +140,6 @@ void loop() {
 
   // wait a couple seconds to avoid rate limit
   delay(2000);
-
 }
 
 // Function to connect and reconnect as necessary to the MQTT server.
@@ -141,15 +156,16 @@ void MQTT_connect() {
 
   uint8_t retries = 3;
   while ((ret = mqtt.connect()) != 0) { // connect will return 0 for connected
-       Serial.println(mqtt.connectErrorString(ret));
-       Serial.println("Retrying MQTT connection in 5 seconds...");
-       mqtt.disconnect();
-       delay(5000);  // wait 5 seconds
-       retries--;
-       if (retries == 0) {
-         // basically die and wait for WDT to reset me
-         while (1);
-       }
+    Serial.println(mqtt.connectErrorString(ret));
+    Serial.println("Retrying MQTT connection in 5 seconds...");
+    mqtt.disconnect();
+    delay(5000); // wait 5 seconds
+    retries--;
+    if (retries == 0) {
+      // basically die and wait for WDT to reset me
+      while (1)
+        ;
+    }
   }
 
   Serial.println("MQTT Connected!");
