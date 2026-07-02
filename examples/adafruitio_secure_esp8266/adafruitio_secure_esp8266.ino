@@ -16,9 +16,9 @@
   SSL/TLS additions by Todd Treece for Adafruit Industries.
   MIT license, all text above must be included in any redistribution
  ****************************************************/
+#include <ESP8266WiFi.h>
 #include "Adafruit_MQTT.h"
 #include "Adafruit_MQTT_Client.h"
-#include <ESP8266WiFi.h>
 
 /************************* WiFi Access Point *********************************/
 
@@ -76,7 +76,7 @@ Write-Output ($fingerprint -replace '(.{2})', '$1 ' -replace ' $', '');
 ```
 */
 
-/* Replace the empty string below with your updated SHA1 fingerprint: */
+/* Replace the empty string below with your updated SHA1 fingerprint (e.g: "47 D2 CB 14..."") */
 static const char *fingerprint PROGMEM = " ";
 
 /****************************** Feeds ***************************************/
