@@ -22,8 +22,20 @@
 #include "Adafruit_MQTT_Client.h"
 
 bool Adafruit_MQTT_Client::connectServer() {
+  if (buffer == NULL || maxBufferSize == 0) {
+    DEBUG_PRINT(F("MQTT buffer was not allocated!"));
+    return false;
+  }
+
+  // The strcpy() below is unbounded, so the name has to fit with room for the
+  // NUL terminator.
+  if (strlen(servername) >= maxBufferSize) {
+    DEBUG_PRINT(F("Server name is longer than the MQTT buffer"));
+    return false;
+  }
+
   // Grab server name from flash and copy to buffer for name resolution.
-  memset(buffer, 0, sizeof(buffer));
+  memset(buffer, 0, maxBufferSize);
   strcpy((char *)buffer, servername);
   DEBUG_PRINT(F("Connecting to: "));
   DEBUG_PRINTLN((char *)buffer);
