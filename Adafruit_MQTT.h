@@ -160,7 +160,8 @@ public:
                 const char *pass = "", uint16_t maxBufferSz = MAXBUFFERSIZE);
   virtual ~Adafruit_MQTT();
 
-  // Allocate a zeroed buffer of expectedSz bytes, returns NULL if the allocation fails
+  // Allocate a zeroed buffer of expectedSz bytes, returns NULL if the
+  // allocation fails
   static uint8_t *allocateMqttBuffer(uint16_t expectedSz);
 
   // Connect to the MQTT server.  Returns 0 on success, otherwise an error code
@@ -189,7 +190,8 @@ public:
   // Return true if connected to the MQTT server, otherwise false.
   virtual bool connected() = 0; // Subclasses need to fill this in!
 
-  // Size of the packet buffer, in bytes, as actually allocated. Returns 0 if the buffer allocation failed.
+  // Size of the packet buffer, in bytes, as actually allocated. Returns 0 if
+  // the buffer allocation failed.
   uint16_t bufferSize() const { return maxBufferSize; }
 
   // Set MQTT last will topic, payload, QOS, and retain. This needs
@@ -330,7 +332,8 @@ public:
 
   uint8_t *lastread;
   uint16_t lastread_max; // size of lastread, in bytes, 0 if allocation failed
-  // Number of valid bytes in lastread. Limited to lastread_max-1 to ensure NULL terminated lastread.
+  // Number of valid bytes in lastread. Limited to lastread_max-1 to ensure NULL
+  // terminated lastread.
   uint16_t datalen;
 
   SubscribeCallbackUInt32Type callback_uint32t;
