@@ -366,7 +366,8 @@ uint16_t Adafruit_MQTT::readFullPacket(uint8_t *buffer, uint16_t maxsize,
 
   // maxsize is limited to 65536 by 16-bit unsigned
   if (value > uint32_t(maxsize - (pbuff - buffer) - 1)) {
-    DEBUG_PRINTLN(F("Incoming packet too large for buffer - reading and dropping the rest of the packet"));
+    DEBUG_PRINTLN(F("Incoming packet too large for buffer - reading and "
+                    "dropping the rest of the packet"));
     uint8_t sink[64];
     uint32_t remaining = value;
     while (remaining > 0) {
@@ -439,8 +440,8 @@ bool Adafruit_MQTT::publish(const char *topic, uint8_t *data, uint16_t bLen,
   }
 
   // Construct and send publish packet.
-  uint16_t len = publishPacket(buffer, topic, data, bLen, qos, maxBufferSize,
-                               retain);
+  uint16_t len =
+      publishPacket(buffer, topic, data, bLen, qos, maxBufferSize, retain);
   if (len == 0)
     return false; // packet did not fit
 
@@ -689,7 +690,8 @@ Adafruit_MQTT_Subscribe *Adafruit_MQTT::handleSubscriptionPacket(uint16_t len) {
   if (subscriptions[i]->lastread == NULL ||
       subscriptions[i]->lastread_max < 2) {
     ERROR_PRINTLN(F("Subscription payload buffer was not allocated"));
-    // Clear the new_message flag and datalen to avoid processing this message again
+    // Clear the new_message flag and datalen to avoid processing this message
+    // again
     subscriptions[i]->new_message = false;
     subscriptions[i]->datalen = 0;
     return NULL;
@@ -709,7 +711,8 @@ Adafruit_MQTT_Subscribe *Adafruit_MQTT::handleSubscriptionPacket(uint16_t len) {
   memset(subscriptions[i]->lastread, 0, subscriptions[i]->lastread_max);
 
   datalen = len - topiclen - packet_id_len - topicstart;
-  // Reserve one byte for the NUL terminator, so, the usable payload is lastread_max - 1.
+  // Reserve one byte for the NUL terminator, so, the usable payload is
+  // lastread_max - 1.
   if (datalen > (uint16_t)(subscriptions[i]->lastread_max - 1)) {
     datalen = subscriptions[i]->lastread_max - 1; // cut it off
   }
@@ -1065,7 +1068,8 @@ Adafruit_MQTT_Subscribe::Adafruit_MQTT_Subscribe(Adafruit_MQTT *mqttserver,
   new_message = false;
 
   // Allocate a buffer for the subscription payload.
-  // NOTE: The buffer must be at least 2 bytes to hold the NULL terminator + one character
+  // NOTE: The buffer must be at least 2 bytes to hold the NULL terminator + one
+  // character
   if (datalen_max < 2) {
     datalen_max = 2;
   }
