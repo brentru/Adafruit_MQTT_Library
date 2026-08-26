@@ -27,8 +27,6 @@ bool Adafruit_MQTT_Client::connectServer() {
     return false;
   }
 
-  // The strcpy() below is unbounded, so the name has to fit with room for the
-  // NUL terminator.
   if (strlen(servername) >= maxBufferSize) {
     DEBUG_PRINT(F("Server name is longer than the MQTT buffer"));
     return false;

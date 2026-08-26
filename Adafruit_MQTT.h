@@ -45,52 +45,34 @@
 // Define actual debug output functions when necessary.
 #ifdef MQTT_DEBUG
 #define DEBUG_PRINT(...)                                                       \
-  {                                                                            \
-    DEBUG_PRINTER.print(__VA_ARGS__);                                          \
-  }
+  { DEBUG_PRINTER.print(__VA_ARGS__); }
 #define DEBUG_PRINTLN(...)                                                     \
-  {                                                                            \
-    DEBUG_PRINTER.println(__VA_ARGS__);                                        \
-  }
+  { DEBUG_PRINTER.println(__VA_ARGS__); }
 #define DEBUG_PRINTBUFFER(buffer, len)                                         \
-  {                                                                            \
-    printBuffer(buffer, len);                                                  \
-  }
+  { printBuffer(buffer, len); }
 #else
 #define DEBUG_PRINT(...)                                                       \
-  {                                                                            \
-  }
+  {}
 #define DEBUG_PRINTLN(...)                                                     \
-  {                                                                            \
-  }
+  {}
 #define DEBUG_PRINTBUFFER(buffer, len)                                         \
-  {                                                                            \
-  }
+  {}
 #endif
 
 #ifdef MQTT_ERROR
 #define ERROR_PRINT(...)                                                       \
-  {                                                                            \
-    DEBUG_PRINTER.print(__VA_ARGS__);                                          \
-  }
+  { DEBUG_PRINTER.print(__VA_ARGS__); }
 #define ERROR_PRINTLN(...)                                                     \
-  {                                                                            \
-    DEBUG_PRINTER.println(__VA_ARGS__);                                        \
-  }
+  { DEBUG_PRINTER.println(__VA_ARGS__); }
 #define ERROR_PRINTBUFFER(buffer, len)                                         \
-  {                                                                            \
-    printBuffer(buffer, len);                                                  \
-  }
+  { printBuffer(buffer, len); }
 #else
 #define ERROR_PRINT(...)                                                       \
-  {                                                                            \
-  }
+  {}
 #define ERROR_PRINTLN(...)                                                     \
-  {                                                                            \
-  }
+  {}
 #define ERROR_PRINTBUFFER(buffer, len)                                         \
-  {                                                                            \
-  }
+  {}
 #endif
 
 // Use 3 (MQTT 3.0) or 4 (MQTT 3.1.1)
@@ -178,10 +160,7 @@ public:
                 const char *pass = "", uint16_t maxBufferSz = MAXBUFFERSIZE);
   virtual ~Adafruit_MQTT();
 
-  // Allocate a zeroed buffer of expectedSz bytes, preferring PSRAM when the
-  // board provides it (BOARD_HAS_PSRAM). Returns NULL if the allocation
-  // failed. Static so that Adafruit_MQTT_Subscribe can allocate its own
-  // payload buffer through it without touching a client's packet buffer.
+  // Allocate a zeroed buffer of expectedSz bytes, returns NULL if the allocation fails
   static uint8_t *allocateMqttBuffer(uint16_t expectedSz);
 
   // Connect to the MQTT server.  Returns 0 on success, otherwise an error code
@@ -210,9 +189,7 @@ public:
   // Return true if connected to the MQTT server, otherwise false.
   virtual bool connected() = 0; // Subclasses need to fill this in!
 
-  // Size of the packet buffer, in bytes, as actually allocated. Returns 0 if
-  // the allocation failed - in which case connect(), publish() and the
-  // subscription machinery will all refuse to run.
+  // Size of the packet buffer, in bytes, as actually allocated. Returns 0 if the buffer allocation failed.
   uint16_t bufferSize() const { return maxBufferSize; }
 
   // Set MQTT last will topic, payload, QOS, and retain. This needs
@@ -235,11 +212,6 @@ public:
   // subscription could be added or was already present, false otherwise.
   // Must be called before connect(), subscribing after the connection
   // is made is not currently supported.
-  //
-  // NOTE: this does not send anything. It only records the pointer in the
-  // subscriptions[] array; connect() is what walks that array, sends the
-  // SUBSCRIBE packets and waits for each SUBACK. A subscription added after
-  // connect() is silently inert until the next reconnect.
   bool subscribe(Adafruit_MQTT_Subscribe *sub);
 
   // Unsubscribe from a previously subscribed MQTT topic.
@@ -324,10 +296,6 @@ class Adafruit_MQTT_Publish {
 public:
   Adafruit_MQTT_Publish(Adafruit_MQTT *mqttserver, const char *feed,
                         uint8_t qos = 0);
-
-  // NOTE: watch overload resolution against the (uint8_t *, uint16_t, bool)
-  // form below. publish("\0", 1) binds to THIS overload with retain = 1, so
-  // it publishes a *retained* empty message rather than a 1-byte payload.
   bool publish(const char *s, bool retain = false);
   bool publish(
       double f,
@@ -347,9 +315,6 @@ private:
 
 class Adafruit_MQTT_Subscribe {
 public:
-  // datalen_max is the size of the payload buffer allocated for this
-  // subscription, in bytes; it is clamped to a minimum of 2 (one payload byte
-  // plus the NUL terminator).
   Adafruit_MQTT_Subscribe(Adafruit_MQTT *mqttserver, const char *feedname,
                           uint8_t q = 0,
                           uint16_t datalen_max = SUBSCRIPTIONDATALEN);
@@ -363,17 +328,9 @@ public:
   const char *topic;
   uint8_t qos;
 
-  // NOTE: lastread is intentionally never freed -- this class has no
-  // destructor. Subscriptions are file-scope globals that live for the life of
-  // the program, and every example declares them with copy-initialization:
-  //     Adafruit_MQTT_Subscribe s = Adafruit_MQTT_Subscribe(&mqtt, FEED);
-  // which may copy rather than elide on pre-C++17 cores. Adding a destructor
-  // without also adding a deep copy constructor would free the temporary's
-  // buffer and leave those objects with a dangling lastread.
   uint8_t *lastread;
   uint16_t lastread_max; // size of lastread, in bytes, 0 if allocation failed
-  // Number valid bytes in lastread. Limited to lastread_max-1 to
-  // ensure nul terminating lastread.
+  // Number of valid bytes in lastread. Limited to lastread_max-1 to ensure NULL terminated lastread.
   uint16_t datalen;
 
   SubscribeCallbackUInt32Type callback_uint32t;
