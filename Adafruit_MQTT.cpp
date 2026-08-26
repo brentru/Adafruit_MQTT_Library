@@ -188,13 +188,12 @@ uint8_t *Adafruit_MQTT::allocateMqttBuffer(uint16_t expectedSz) {
 #ifdef BOARD_HAS_PSRAM
   buf = (uint8_t *)ps_malloc(expectedSz);
 #endif
-  // Fall back to the regular heap. This also covers ps_malloc() returning NULL
-  // at runtime when PSRAM is absent or unhealthy.
+  // fall back to the regular heap
   if (buf == NULL) {
     buf = (uint8_t *)malloc(expectedSz);
   }
   if (buf != NULL) {
-    // If the buffer was successfully allocated, clear it
+    // If the buffer was successfully allocated, zero it out
     memset(buf, 0x00, expectedSz);
   }
   return buf;
@@ -299,8 +298,6 @@ uint16_t Adafruit_MQTT::processPacketsUntil(uint8_t *buffer,
   uint16_t len;
 
   while (true) {
-    // NOTE: the 'buffer' parameter shadows the member of the same name. Every
-    // caller passes the member, so maxBufferSize is its size.
     len = readFullPacket(buffer, maxBufferSize, timeout);
 
     if (len == 0) {
@@ -417,18 +414,15 @@ const __FlashStringHelper *Adafruit_MQTT::connectErrorString(int8_t code) {
 }
 
 bool Adafruit_MQTT::disconnect() {
-
-  // Skip the DISCONNECT packet if there is no buffer to build it in, but still
-  // tear down the connection -- that part does not need the buffer.
   if (buffer == NULL || maxBufferSize == 0) {
     ERROR_PRINTLN(F("MQTT buffer was not allocated"));
+    // NOTE: DO NOT return here, we still need to disconnect from the server!
   } else {
     // Construct and send disconnect packet.
     uint8_t len = disconnectPacket(buffer);
     if (!sendPacket(buffer, len))
       DEBUG_PRINTLN(F("Unable to send disconnect packet"));
   }
-
   return disconnectServer();
 }
 
@@ -692,13 +686,10 @@ Adafruit_MQTT_Subscribe *Adafruit_MQTT::handleSubscriptionPacket(uint16_t len) {
   if (i == MAXSUBSCRIPTIONS)
     return NULL; // matching sub not found ???
 
-  // Drop the message if this subscription has no usable payload buffer.
-  // lastread_max >= 2 guarantees the lastread_max - 1 below cannot underflow.
   if (subscriptions[i]->lastread == NULL ||
       subscriptions[i]->lastread_max < 2) {
     ERROR_PRINTLN(F("Subscription payload buffer was not allocated"));
-    // The match loop above already flagged this subscription. Clear it again,
-    // otherwise readSubscription() would hand back a message we never stored.
+    // Clear the new_message flag and datalen to avoid processing this message again
     subscriptions[i]->new_message = false;
     subscriptions[i]->datalen = 0;
     return NULL;
@@ -718,8 +709,7 @@ Adafruit_MQTT_Subscribe *Adafruit_MQTT::handleSubscriptionPacket(uint16_t len) {
   memset(subscriptions[i]->lastread, 0, subscriptions[i]->lastread_max);
 
   datalen = len - topiclen - packet_id_len - topicstart;
-  // One byte is reserved for the NUL terminator, so the usable payload is
-  // lastread_max - 1.
+  // Reserve one byte for the NUL terminator, so, the usable payload is lastread_max - 1.
   if (datalen > (uint16_t)(subscriptions[i]->lastread_max - 1)) {
     datalen = subscriptions[i]->lastread_max - 1; // cut it off
   }
@@ -893,9 +883,7 @@ uint16_t Adafruit_MQTT::publishPacket(uint8_t *packet, const char *topic,
     // able to accomodate. Alternatively, consider using a bigger
     // maxPacketLen.
     uint16_t overhead = len + 2 + packetAdditionalLen(maxPacketLen);
-    // Check the capacity before subtracting: this is unsigned arithmetic, so
-    // an undersized maxPacketLen would wrap to ~64KB and the memmove() below
-    // would run far past the end of the buffer.
+    // Checks the capacity to prevent underflow
     if (maxPacketLen <= overhead) {
       ERROR_PRINTLN(F("Buffer too small for topic"));
       return 0;
@@ -1082,7 +1070,11 @@ Adafruit_MQTT_Subscribe::Adafruit_MQTT_Subscribe(Adafruit_MQTT *mqttserver,
     datalen_max = 2;
   }
   lastread = Adafruit_MQTT::allocateMqttBuffer(datalen_max);
-  lastread_max = (lastread != NULL) ? datalen_max : 0;
+  if (lastread != NULL) {
+    lastread_max = datalen_max;
+  } else {
+    lastread_max = 0;
+  }
 }
 
 void Adafruit_MQTT_Subscribe::setCallback(SubscribeCallbackUInt32Type cb) {
