@@ -332,8 +332,8 @@ public:
 
   uint8_t *lastread;
   uint16_t lastread_max; // size of lastread, in bytes, 0 if allocation failed
-  // Number of valid bytes in lastread. Limited to lastread_max-1 to ensure NULL
-  // terminated lastread.
+  // Number of valid bytes in lastread. Limited to lastread_max-1 to ensure
+  // NUL-terminated lastread.
   uint16_t datalen;
 
   SubscribeCallbackUInt32Type callback_uint32t;
