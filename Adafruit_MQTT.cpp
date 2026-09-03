@@ -46,9 +46,9 @@ int strncasecmp(const char *str1, const char *str2, int len) {
 }
 #endif
 
-void printBuffer(uint8_t *buffer, uint16_t len) {
+void printBuffer(uint8_t *buffer, size_t len) {
   DEBUG_PRINTER.print('\t');
-  for (uint16_t i = 0; i < len; i++) {
+  for (size_t i = 0; i < len; i++) {
     if (isprint(buffer[i]))
       DEBUG_PRINTER.write(buffer[i]);
     else
@@ -101,13 +101,13 @@ static uint8_t *stringprint(uint8_t *p, const char *s, uint16_t maxlen = 0) {
 // its variable length field. As per
 // http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Table_2.4_Size
 // See also readFullPacket
-static uint16_t packetAdditionalLen(uint32_t currLen) {
+static uint16_t packetAdditionalLen(size_t currLen) {
   /* Increase length field based on current length */
   if (currLen < 128) // 7-bits
     return 0;
-  if (currLen < 16384) // 14-bits
+  if (currLen < 16384UL) // 14-bits
     return 1;
-  if (currLen < 2097152) // 21-bits
+  if (currLen < 2097152UL) // 21-bits
     return 2;
   return 3;
 }
@@ -116,7 +116,7 @@ static uint16_t packetAdditionalLen(uint32_t currLen) {
 
 Adafruit_MQTT::Adafruit_MQTT(const char *server, uint16_t port, const char *cid,
                              const char *user, const char *pass,
-                             uint16_t maxBufferSz) {
+                             size_t maxBufferSz) {
   servername = server;
   portnum = port;
   clientid = cid;
@@ -147,7 +147,7 @@ Adafruit_MQTT::Adafruit_MQTT(const char *server, uint16_t port, const char *cid,
 
 Adafruit_MQTT::Adafruit_MQTT(const char *server, uint16_t port,
                              const char *user, const char *pass,
-                             uint16_t maxBufferSz) {
+                             size_t maxBufferSz) {
   servername = server;
   portnum = port;
   clientid = "";
@@ -182,7 +182,7 @@ Adafruit_MQTT::~Adafruit_MQTT() {
   maxBufferSize = 0;
 }
 
-uint8_t *Adafruit_MQTT::allocateMqttBuffer(uint16_t expectedSz) {
+uint8_t *Adafruit_MQTT::allocateMqttBuffer(size_t expectedSz) {
   uint8_t *buf = NULL;
 // Attempt to allocate using PSRAM, first
 #ifdef BOARD_HAS_PSRAM
@@ -210,7 +210,7 @@ int8_t Adafruit_MQTT::connect() {
     return -1;
 
   // Construct and send connect packet.
-  uint8_t len = connectPacket(buffer);
+  size_t len = connectPacket(buffer);
   if (!sendPacket(buffer, len))
     return -1;
 
@@ -235,8 +235,8 @@ int8_t Adafruit_MQTT::connect() {
     for (uint8_t retry = 0; (retry < 3) && !success;
          retry++) { // retry until we get a suback
       // Construct and send subscription packet.
-      uint8_t len = subscribePacket(buffer, subscriptions[i]->topic,
-                                    subscriptions[i]->qos);
+      size_t len = subscribePacket(buffer, subscriptions[i]->topic,
+                                   subscriptions[i]->qos);
       if (!sendPacket(buffer, len))
         return -1;
 
@@ -278,11 +278,38 @@ void Adafruit_MQTT::processSubscriptionPacket(Adafruit_MQTT_Subscribe *sub) {
     data = atof((char *)sub->lastread);
     sub->callback_double(data);
   } else if (sub->callback_buffer != NULL) {
-    // execute callback in buffer mode
-    sub->callback_buffer((char *)sub->lastread, sub->datalen);
+    // execute callback in buffer mode. This callback takes a uint16_t length,
+    // so clamp what we report; the buffer itself is still complete.
+    size_t cblen = sub->datalen;
+#if defined(ADAFRUIT_MQTT_WIDE_SIZE_T)
+    if (cblen > 0xFFFFUL) {
+      DEBUG_PRINTLN(F("Payload > 64KB, clamping len for uint16_t callback"));
+      cblen = 0xFFFFUL;
+    }
+#endif
+    sub->callback_buffer((char *)sub->lastread, (uint16_t)cblen);
+#if defined(ADAFRUIT_MQTT_WIDE_SIZE_T)
+  } else if (sub->callback_buffer_large != NULL) {
+    // execute callback in buffer mode, with a size_t length
+    sub->callback_buffer_large((char *)sub->lastread, sub->datalen);
+#endif
   } else if (sub->callback_io != NULL) {
     // execute callback in io mode
-    ((sub->io_mqtt)->*(sub->callback_io))((char *)sub->lastread, sub->datalen);
+    size_t cblen = sub->datalen;
+#if defined(ADAFRUIT_MQTT_WIDE_SIZE_T)
+    if (cblen > 0xFFFFUL) {
+      DEBUG_PRINTLN(F("Payload > 64KB, clamping len for uint16_t callback"));
+      cblen = 0xFFFFUL;
+    }
+#endif
+    ((sub->io_mqtt)->*(sub->callback_io))((char *)sub->lastread,
+                                          (uint16_t)cblen);
+#if defined(ADAFRUIT_MQTT_WIDE_SIZE_T)
+  } else if (sub->callback_io_large != NULL) {
+    // execute callback in io mode, with a size_t length
+    ((sub->io_mqtt)->*(sub->callback_io_large))((char *)sub->lastread,
+                                                sub->datalen);
+#endif
   } else {
     DEBUG_PRINTLN(
         "ERROR: Subscription packet did not have an associated callback");
@@ -292,10 +319,10 @@ void Adafruit_MQTT::processSubscriptionPacket(Adafruit_MQTT_Subscribe *sub) {
   sub->new_message = false;
 }
 
-uint16_t Adafruit_MQTT::processPacketsUntil(uint8_t *buffer,
-                                            uint8_t waitforpackettype,
-                                            uint16_t timeout) {
-  uint16_t len;
+size_t Adafruit_MQTT::processPacketsUntil(uint8_t *buffer,
+                                          uint8_t waitforpackettype,
+                                          uint16_t timeout) {
+  size_t len;
 
   while (true) {
     len = readFullPacket(buffer, maxBufferSize, timeout);
@@ -320,8 +347,8 @@ uint16_t Adafruit_MQTT::processPacketsUntil(uint8_t *buffer,
   return 0;
 }
 
-uint16_t Adafruit_MQTT::readFullPacket(uint8_t *buffer, uint16_t maxsize,
-                                       uint16_t timeout) {
+size_t Adafruit_MQTT::readFullPacket(uint8_t *buffer, size_t maxsize,
+                                     uint16_t timeout) {
   if (buffer == NULL || maxsize < 8) {
     ERROR_PRINTLN(F("Packet buffer missing or too small"));
     return 0;
@@ -330,10 +357,10 @@ uint16_t Adafruit_MQTT::readFullPacket(uint8_t *buffer, uint16_t maxsize,
   // will read a packet and Do The Right Thing with length
   uint8_t *pbuff = buffer;
 
-  uint16_t rlen;
+  size_t rlen;
 
   // read the packet type:
-  rlen = readPacket(pbuff, 1, timeout);
+  rlen = readPacket(pbuff, (size_t)1, timeout);
   if (rlen != 1)
     return 0;
 
@@ -346,7 +373,7 @@ uint16_t Adafruit_MQTT::readFullPacket(uint8_t *buffer, uint16_t maxsize,
   uint8_t encodedByte;
 
   do {
-    rlen = readPacket(pbuff, 1, timeout);
+    rlen = readPacket(pbuff, (size_t)1, timeout);
     if (rlen != 1)
       return 0;
     encodedByte = pbuff[0]; // save the last read val
@@ -364,26 +391,30 @@ uint16_t Adafruit_MQTT::readFullPacket(uint8_t *buffer, uint16_t maxsize,
   DEBUG_PRINT(F("Packet Length:\t"));
   DEBUG_PRINTLN(value);
 
-  // maxsize is limited to 65536 by 16-bit unsigned
-  if (value > uint32_t(maxsize - (pbuff - buffer) - 1)) {
+  // Bytes of the caller's buffer already consumed by the fixed header and the
+  // remaining length field, and what is left after reserving one byte so the
+  // payload can always be NUL-terminated.
+  size_t consumed = (size_t)(pbuff - buffer);
+  size_t avail = (maxsize > consumed + 1) ? (maxsize - consumed - 1) : 0;
+  if (value > avail) {
     DEBUG_PRINTLN(F("Incoming packet too large for buffer - reading and "
                     "dropping the rest of the packet"));
     uint8_t sink[64];
     uint32_t remaining = value;
     while (remaining > 0) {
-      uint16_t chunk = (remaining > sizeof(sink)) ? (uint16_t)sizeof(sink)
-                                                  : (uint16_t)remaining;
-      uint16_t got = readPacket(sink, chunk, timeout);
+      size_t chunk =
+          (remaining > sizeof(sink)) ? sizeof(sink) : (size_t)remaining;
+      size_t got = readPacket(sink, chunk, timeout);
       if (got == 0)
         break; // connection stalled or closed, nothing more to drain
       remaining -= got;
     }
     return 0;
   }
-  rlen = readPacket(pbuff, value, timeout);
+  rlen = readPacket(pbuff, (size_t)value, timeout);
   // DEBUG_PRINT(F("Remaining packet:\t")); DEBUG_PRINTBUFFER(pbuff, rlen);
 
-  return ((pbuff - buffer) + rlen);
+  return (consumed + rlen);
 }
 
 const __FlashStringHelper *Adafruit_MQTT::connectErrorString(int8_t code) {
@@ -420,7 +451,7 @@ bool Adafruit_MQTT::disconnect() {
     // NOTE: DO NOT return here, we still need to disconnect from the server!
   } else {
     // Construct and send disconnect packet.
-    uint8_t len = disconnectPacket(buffer);
+    size_t len = disconnectPacket(buffer);
     if (!sendPacket(buffer, len))
       DEBUG_PRINTLN(F("Unable to send disconnect packet"));
   }
@@ -432,7 +463,7 @@ bool Adafruit_MQTT::publish(const char *topic, const char *data, uint8_t qos,
   return publish(topic, (uint8_t *)(data), strlen(data), qos, retain);
 }
 
-bool Adafruit_MQTT::publish(const char *topic, uint8_t *data, uint16_t bLen,
+bool Adafruit_MQTT::publish(const char *topic, uint8_t *data, size_t bLen,
                             uint8_t qos, bool retain) {
   if (buffer == NULL || maxBufferSize == 0) {
     ERROR_PRINTLN(F("MQTT buffer was not allocated"));
@@ -440,7 +471,7 @@ bool Adafruit_MQTT::publish(const char *topic, uint8_t *data, uint16_t bLen,
   }
 
   // Construct and send publish packet.
-  uint16_t len =
+  size_t len =
       publishPacket(buffer, topic, data, bLen, qos, maxBufferSize, retain);
   if (len == 0)
     return false; // packet did not fit
@@ -542,7 +573,7 @@ bool Adafruit_MQTT::unsubscribe(Adafruit_MQTT_Subscribe *sub) {
           F("Found matching subscription and attempting to unsubscribe."));
 
       // Construct and send unsubscribe packet.
-      uint8_t len = unsubscribePacket(buffer, subscriptions[i]->topic);
+      size_t len = unsubscribePacket(buffer, subscriptions[i]->topic);
 
       // sending unsubscribe failed
       if (!sendPacket(buffer, len))
@@ -603,8 +634,8 @@ Adafruit_MQTT_Subscribe *Adafruit_MQTT::readSubscription(int16_t timeout) {
   // not unread message
   if (!s) {
     // Check if data is available to read.
-    uint16_t len = readFullPacket(buffer, maxBufferSize,
-                                  timeout); // return one full packet
+    size_t len = readFullPacket(buffer, maxBufferSize,
+                                timeout); // return one full packet
     s = handleSubscriptionPacket(len);
   }
 
@@ -616,8 +647,9 @@ Adafruit_MQTT_Subscribe *Adafruit_MQTT::readSubscription(int16_t timeout) {
   return s;
 }
 
-Adafruit_MQTT_Subscribe *Adafruit_MQTT::handleSubscriptionPacket(uint16_t len) {
-  uint16_t i, topiclen, datalen;
+Adafruit_MQTT_Subscribe *Adafruit_MQTT::handleSubscriptionPacket(size_t len) {
+  uint16_t i;
+  size_t topiclen, datalen;
 
   if (!len) {
     return NULL; // No data available, just quit.
@@ -654,12 +686,18 @@ Adafruit_MQTT_Subscribe *Adafruit_MQTT::handleSubscriptionPacket(uint16_t len) {
     }
   } while ((encodedByte & 128) != 0);
 
+  // Make sure the 2-byte topic length field is actually present.
+  if ((size_t)offset + 2 > len) {
+    ERROR_PRINTLN(F("Bad MQTT packet: truncated topic length"));
+    return NULL;
+  }
+
   // Now 'offset' points to the first byte of the topic length field.
   // The topic length is always 2 bytes, big-endian.
   uint16_t new_msb = buffer[offset] << 8;
   uint16_t new_lsb = buffer[offset + 1];
   topiclen = new_msb | new_lsb;
-  uint16_t topicstart = offset + 2;
+  size_t topicstart = (size_t)offset + 2;
 
   // Find subscription associated with this packet.
   for (i = 0; i < MAXSUBSCRIPTIONS; i++) {
@@ -702,6 +740,20 @@ Adafruit_MQTT_Subscribe *Adafruit_MQTT::handleSubscriptionPacket(uint16_t len) {
   // Check if it is QoS 1, TODO: we dont support QoS 2
   if ((buffer[0] & 0x6) == 0x2) {
     packet_id_len = 2;
+  }
+
+  // The packet must be long enough to hold the topic and, for QoS 1, the
+  // packet identifier. Without this the subtraction below wraps to a huge
+  // value now that these lengths are size_t.
+  size_t header_len = topicstart + topiclen + packet_id_len;
+  if (len < header_len) {
+    ERROR_PRINTLN(F("Bad MQTT packet: payload length underflow"));
+    subscriptions[i]->new_message = false;
+    subscriptions[i]->datalen = 0;
+    return NULL;
+  }
+
+  if (packet_id_len == 2) {
     packetid = buffer[topiclen + topicstart];
     packetid <<= 8;
     packetid |= buffer[topiclen + topicstart + 1];
@@ -710,10 +762,10 @@ Adafruit_MQTT_Subscribe *Adafruit_MQTT::handleSubscriptionPacket(uint16_t len) {
   // zero out the old data
   memset(subscriptions[i]->lastread, 0, subscriptions[i]->lastread_max);
 
-  datalen = len - topiclen - packet_id_len - topicstart;
+  datalen = len - header_len;
   // Reserve one byte for the NUL terminator, so, the usable payload is
   // lastread_max - 1.
-  if (datalen > (uint16_t)(subscriptions[i]->lastread_max - 1)) {
+  if (datalen > subscriptions[i]->lastread_max - 1) {
     datalen = subscriptions[i]->lastread_max - 1; // cut it off
   }
   // extract out just the data, into the subscription object itself
@@ -729,8 +781,8 @@ Adafruit_MQTT_Subscribe *Adafruit_MQTT::handleSubscriptionPacket(uint16_t len) {
     uint8_t ackpacket[4];
 
     // Construct and send puback packet.
-    uint8_t len = pubackPacket(ackpacket, packetid);
-    if (!sendPacket(ackpacket, len))
+    size_t acklen = pubackPacket(ackpacket, packetid);
+    if (!sendPacket(ackpacket, acklen))
       DEBUG_PRINT(F("Failed"));
   }
 
@@ -754,7 +806,7 @@ bool Adafruit_MQTT::ping(uint8_t num) {
 
   while (num--) {
     // Construct and send ping packet.
-    uint8_t len = pingPacket(buffer);
+    size_t len = pingPacket(buffer);
     if (!sendPacket(buffer, len))
       continue;
 
@@ -858,34 +910,48 @@ uint8_t Adafruit_MQTT::connectPacket(uint8_t *packet) {
 
 // as per
 // http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718040
-uint16_t Adafruit_MQTT::publishPacket(uint8_t *packet, const char *topic,
-                                      uint8_t *data, uint16_t bLen, uint8_t qos,
-                                      uint16_t maxPacketLen, bool retain) {
+size_t Adafruit_MQTT::publishPacket(uint8_t *packet, const char *topic,
+                                    uint8_t *data, size_t bLen, uint8_t qos,
+                                    size_t maxPacketLen, bool retain) {
   uint8_t *p = packet;
-  uint16_t len = 0;
+  size_t len = 0;
+
+  // MQTT UTF-8 strings are length-prefixed with 2 bytes on the wire, so a
+  // topic longer than this cannot be encoded. stringprint() would silently
+  // truncate the length field while writing the full string.
+  size_t topicLen = strlen(topic);
+#if defined(ADAFRUIT_MQTT_WIDE_SIZE_T)
+  if (topicLen > 0xFFFFUL) {
+    ERROR_PRINTLN(F("Topic too long"));
+    return 0;
+  }
+#endif
 
   // calc length of non-header data
-  len += 2;             // two bytes to set the topic size
-  len += strlen(topic); // topic length
+  len += 2;        // two bytes to set the topic size
+  len += topicLen; // topic length
   if (qos > 0) {
     len += 2; // qos packet id
   }
   // Calculate additional bytes for length field (if any)
-  uint16_t additionalLen = packetAdditionalLen(len + bLen);
+  size_t additionalLen = packetAdditionalLen(len + bLen);
 
   // Payload remaining length. When maxPacketLen provided is 0, let's
   // assume buffer is big enough. Fingers crossed.
   // 2 + additionalLen: header byte + remaining length field (from 1 to 4 bytes)
   // len = topic size field + value (string)
   // bLen = buffer size
-  if (!(maxPacketLen == 0 ||
-        (len + bLen + 2 + additionalLen <= maxPacketLen))) {
+  // Compare by subtraction rather than by summing all four terms, so the
+  // check itself cannot overflow now that these are size_t.
+  size_t overhead = len + 2 + additionalLen;
+  if (maxPacketLen != 0 &&
+      (maxPacketLen <= overhead || bLen > maxPacketLen - overhead)) {
     // If we make it here, we got a pickle: the payload is not going
     // to fit in the packet buffer. Instead of corrupting memory, let's
     // do something less damaging by reducing the bLen to what we are
     // able to accomodate. Alternatively, consider using a bigger
     // maxPacketLen.
-    uint16_t overhead = len + 2 + packetAdditionalLen(maxPacketLen);
+    overhead = len + 2 + packetAdditionalLen(maxPacketLen);
     // Checks the capacity to prevent underflow
     if (maxPacketLen <= overhead) {
       ERROR_PRINTLN(F("Buffer too small for topic"));
@@ -894,6 +960,15 @@ uint16_t Adafruit_MQTT::publishPacket(uint8_t *packet, const char *topic,
     bLen = maxPacketLen - overhead;
   }
   len += bLen; // remaining len excludes header byte & length field
+
+#if defined(ADAFRUIT_MQTT_WIDE_SIZE_T)
+  // MQTT caps the Remaining Length field at 268435455 (a 4-byte varint). The
+  // encoding loop below would happily emit a 5th byte past that.
+  if (len > 268435455UL) {
+    ERROR_PRINTLN(F("Payload exceeds maximum MQTT remaining length"));
+    return 0;
+  }
+#endif
 
   // Now you can start generating the packet!
   p[0] = MQTT_CTRL_PUBLISH << 4 | qos << 1 | (retain ? 1 : 0);
@@ -926,7 +1001,7 @@ uint16_t Adafruit_MQTT::publishPacket(uint8_t *packet, const char *topic,
 
   memmove(p, data, bLen);
   p += bLen;
-  len = p - packet;
+  len = (size_t)(p - packet);
   DEBUG_PRINTLN(F("MQTT publish packet:"));
   DEBUG_PRINTBUFFER(packet, len);
   return len;
@@ -1046,7 +1121,7 @@ bool Adafruit_MQTT_Publish::publish(const char *payload, bool retain) {
 }
 
 // publish buffer of arbitrary length
-bool Adafruit_MQTT_Publish::publish(uint8_t *payload, uint16_t bLen,
+bool Adafruit_MQTT_Publish::publish(uint8_t *payload, size_t bLen,
                                     bool retain) {
   return mqtt->publish(topic, payload, bLen, qos, retain);
 }
@@ -1055,7 +1130,7 @@ bool Adafruit_MQTT_Publish::publish(uint8_t *payload, uint16_t bLen,
 
 Adafruit_MQTT_Subscribe::Adafruit_MQTT_Subscribe(Adafruit_MQTT *mqttserver,
                                                  const char *feed, uint8_t q,
-                                                 uint16_t datalen_max) {
+                                                 size_t datalen_max) {
   mqtt = mqttserver;
   topic = feed;
   qos = q;
@@ -1064,6 +1139,10 @@ Adafruit_MQTT_Subscribe::Adafruit_MQTT_Subscribe(Adafruit_MQTT *mqttserver,
   callback_buffer = 0;
   callback_double = 0;
   callback_io = 0;
+#if defined(ADAFRUIT_MQTT_WIDE_SIZE_T)
+  callback_buffer_large = 0;
+  callback_io_large = 0;
+#endif
   io_mqtt = 0;
   new_message = false;
 
@@ -1091,18 +1170,42 @@ void Adafruit_MQTT_Subscribe::setCallback(SubscribeCallbackDoubleType cb) {
 
 void Adafruit_MQTT_Subscribe::setCallback(SubscribeCallbackBufferType cb) {
   callback_buffer = cb;
+#if defined(ADAFRUIT_MQTT_WIDE_SIZE_T)
+  callback_buffer_large = 0;
+#endif
 }
 
 void Adafruit_MQTT_Subscribe::setCallback(AdafruitIO_MQTT *io,
                                           SubscribeCallbackIOType cb) {
   callback_io = cb;
   io_mqtt = io;
+#if defined(ADAFRUIT_MQTT_WIDE_SIZE_T)
+  callback_io_large = 0;
+#endif
 }
+
+#if defined(ADAFRUIT_MQTT_WIDE_SIZE_T)
+void Adafruit_MQTT_Subscribe::setCallback(SubscribeCallbackBufferLargeType cb) {
+  callback_buffer_large = cb;
+  callback_buffer = 0;
+}
+
+void Adafruit_MQTT_Subscribe::setCallback(AdafruitIO_MQTT *io,
+                                          SubscribeCallbackIOLargeType cb) {
+  callback_io_large = cb;
+  io_mqtt = io;
+  callback_io = 0;
+}
+#endif
 
 void Adafruit_MQTT_Subscribe::removeCallback(void) {
   callback_uint32t = 0;
   callback_buffer = 0;
   callback_double = 0;
   callback_io = 0;
+#if defined(ADAFRUIT_MQTT_WIDE_SIZE_T)
+  callback_buffer_large = 0;
+  callback_io_large = 0;
+#endif
   io_mqtt = 0;
 }
