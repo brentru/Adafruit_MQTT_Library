@@ -368,14 +368,21 @@ size_t Adafruit_MQTT::readFullPacket(uint8_t *buffer, size_t maxsize,
   DEBUG_PRINTBUFFER(pbuff, rlen);
   pbuff++;
 
+  // A short read past this point leaves the stream out of sync
+  int16_t body_timeout =
+      (timeout > PACKET_BODY_TIMEOUT_MS) ? timeout : PACKET_BODY_TIMEOUT_MS;
+
   uint32_t value = 0;
   uint32_t multiplier = 1;
   uint8_t encodedByte;
 
   do {
-    rlen = readPacket(pbuff, (size_t)1, timeout);
-    if (rlen != 1)
+    rlen = readPacket(pbuff, (size_t)1, body_timeout);
+    if (rlen != 1) {
+      ERROR_PRINTLN(F("Timed out reading packet length"));
+      disconnectServer();
       return 0;
+    }
     encodedByte = pbuff[0]; // save the last read val
     pbuff++;                // get ready for reading the next byte
     uint32_t intermediate = encodedByte & 0x7F;
@@ -384,6 +391,7 @@ size_t Adafruit_MQTT::readFullPacket(uint8_t *buffer, size_t maxsize,
     multiplier *= 128;
     if (multiplier > (128UL * 128UL * 128UL)) {
       DEBUG_PRINT(F("Malformed packet len\n"));
+      disconnectServer();
       return 0;
     }
   } while (encodedByte & 0x80);
@@ -404,15 +412,26 @@ size_t Adafruit_MQTT::readFullPacket(uint8_t *buffer, size_t maxsize,
     while (remaining > 0) {
       size_t chunk =
           (remaining > sizeof(sink)) ? sizeof(sink) : (size_t)remaining;
-      size_t got = readPacket(sink, chunk, timeout);
-      if (got == 0)
-        break; // connection stalled or closed, nothing more to drain
+      size_t got = readPacket(sink, chunk, body_timeout);
+      if (got == 0) {
+        ERROR_PRINTLN(F("Timed out draining oversized packet"));
+        disconnectServer();
+        break;
+      }
       remaining -= got;
     }
     return 0;
   }
-  rlen = readPacket(pbuff, (size_t)value, timeout);
-  // DEBUG_PRINT(F("Remaining packet:\t")); DEBUG_PRINTBUFFER(pbuff, rlen);
+  rlen = 0;
+  if (value > 0) {
+    rlen = readPacket(pbuff, (size_t)value, body_timeout);
+    // DEBUG_PRINT(F("Remaining packet:\t")); DEBUG_PRINTBUFFER(pbuff, rlen);
+    if (rlen != value) {
+      ERROR_PRINTLN(F("Short packet read"));
+      disconnectServer();
+      return 0;
+    }
+  }
 
   return (consumed + rlen);
 }
@@ -812,7 +831,7 @@ bool Adafruit_MQTT::ping(uint8_t num) {
 
     // Process ping reply.
     len = processPacketsUntil(buffer, MQTT_CTRL_PINGRESP, PING_TIMEOUT_MS);
-    if (buffer[0] == (MQTT_CTRL_PINGRESP << 4))
+    if (len && buffer[0] == (MQTT_CTRL_PINGRESP << 4))
       return true;
   }
 

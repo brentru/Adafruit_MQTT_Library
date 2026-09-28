@@ -115,6 +115,8 @@
 #define PUBLISH_TIMEOUT_MS 500
 #define PING_TIMEOUT_MS 500
 #define SUBACK_TIMEOUT_MS 500
+// Minimum time to read the rest of a packet once its first byte arrives
+#define PACKET_BODY_TIMEOUT_MS 5000
 
 // Adjust as necessary, in seconds.  Default to 5 minutes.
 #define MQTT_CONN_KEEPALIVE 300
