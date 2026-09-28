@@ -199,10 +199,15 @@ uint8_t *Adafruit_MQTT::allocateMqttBuffer(uint16_t expectedSz) {
   return buf;
 }
 
+/*!
+  @brief  Connects to the MQTT server and sets up subscriptions.
+  @return   0 if successful, -1 if connection failed, -2 if MQTT buffer was not
+  allocated, or an MQTT error code from the server.
+*/
 int8_t Adafruit_MQTT::connect() {
   if (buffer == NULL || maxBufferSize == 0) {
     DEBUG_PRINTLN(F("MQTT buffer was not allocated"));
-    return -1;
+    return -2;
   }
 
   // Connect to the server.
@@ -417,7 +422,6 @@ const __FlashStringHelper *Adafruit_MQTT::connectErrorString(int8_t code) {
 bool Adafruit_MQTT::disconnect() {
   if (buffer == NULL || maxBufferSize == 0) {
     ERROR_PRINTLN(F("MQTT buffer was not allocated"));
-    // NOTE: DO NOT return here, we still need to disconnect from the server!
   } else {
     // Construct and send disconnect packet.
     uint8_t len = disconnectPacket(buffer);
@@ -1080,6 +1084,8 @@ Adafruit_MQTT_Subscribe::Adafruit_MQTT_Subscribe(Adafruit_MQTT *mqttserver,
     lastread_max = 0;
   }
 }
+
+Adafruit_MQTT_Subscribe::~Adafruit_MQTT_Subscribe() { free(lastread); }
 
 void Adafruit_MQTT_Subscribe::setCallback(SubscribeCallbackUInt32Type cb) {
   callback_uint32t = cb;
